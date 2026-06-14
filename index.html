@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LUMIIA Stock — v1.0 -->
+<!-- LUMIIA Stock — v1.1 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -98,6 +98,16 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
 .shsep{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim2);font-weight:700;margin:18px 0 10px}
 .seg{display:flex;gap:8px}.seg button{flex:1;background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
 .seg button.on{background:color-mix(in srgb,var(--congelateur) 18%,var(--card));border-color:var(--congelateur);color:var(--txt)}
+.zrow{padding:11px 0;border-top:1px solid var(--line)}
+.zrow:first-of-type{border-top:none;padding-top:4px}
+.zhead{display:flex;align-items:center;gap:9px}
+.zdot{width:13px;height:13px;border-radius:50%;flex:0 0 auto}
+.zname{font-weight:700;font-size:14px}
+.zcount{font-size:11px;color:var(--dim);flex:1}
+.zbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:13px;flex:0 0 auto}
+.zsw{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-left:22px}
+.sw{width:24px;height:24px;border-radius:7px;cursor:pointer;border:2px solid transparent;box-sizing:border-box}
+.sw.on{border-color:var(--txt)}
 </style>
 </head>
 <body>
@@ -2425,7 +2435,7 @@ var qrcode = function() {
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, remove, push, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const VERSION='v1.0';
+const VERSION='v1.1';
 const APP_URL='https://i-immersion.github.io/Stock-bar/';
 const firebaseConfig={apiKey:"AIzaSyBPgjVFKrP80qX_hlfUFqL168XONfNIBA4",authDomain:"lumiia-live.firebaseapp.com",databaseURL:"https://lumiia-live-default-rtdb.europe-west1.firebasedatabase.app",projectId:"lumiia-live",storageBucket:"lumiia-live.firebasestorage.app",messagingSenderId:"823919513931",appId:"1:823919513931:web:6f6f3c7c6d1699457b18ce"};
 const app=initializeApp(firebaseConfig);
@@ -2435,15 +2445,17 @@ const db=getDatabase(app);
 document.getElementById('ver').textContent=VERSION;
 document.getElementById('li-ver').textContent=VERSION;
 
-const LIEUX={
-  congelateur:{nom:'Congélateur',color:'var(--congelateur)'},
-  frigo:{nom:'Frigo',color:'var(--frigo)'},
-  sec:{nom:'Sec',color:'var(--sec)'},
-  bar:{nom:'Bar',color:'var(--bar)'},
-  conso:{nom:'Conso',color:'var(--conso)'}
+let LIEUX={};
+const DEFAULT_LIEUX={
+  congelateur:{nom:'Congélateur',color:'#3FA9F5',order:1},
+  frigo:{nom:'Frigo',color:'#2ECC71',order:2},
+  sec:{nom:'Sec',color:'#E8A23D',order:3},
+  bar:{nom:'Bar',color:'#B96CFF',order:4},
+  conso:{nom:'Conso',color:'#8A93A6',order:5}
 };
+const ZONE_PALETTE=['#3FA9F5','#2ECC71','#E8A23D','#B96CFF','#8A93A6','#FF6B6B','#22D3C5','#F5C542','#7C83FF','#FF8FB1'];
 
-let state={produits:{},magasins:{},prix:{}};
+let state={produits:{},magasins:{},prix:{},lieux:{}};
 let TAB='stock', LIEU='congelateur', USER=null, sheetOpen=false;
 
 // ---------- helpers ----------
@@ -2488,7 +2500,15 @@ function attachListeners(){
   onValue(ref(db,'stock/produits'),s=>{state.produits=s.val()||{};render();});
   onValue(ref(db,'stock/magasins'),s=>{state.magasins=s.val()||{};render();});
   onValue(ref(db,'stock/prix'),s=>{state.prix=s.val()||{};render();});
+  onValue(ref(db,'stock/lieux'),s=>{
+    const v=s.val();
+    if((!v||!Object.keys(v).length)){ set(ref(db,'stock/lieux'),DEFAULT_LIEUX).catch(()=>{}); return; }
+    state.lieux=v; LIEUX=v;
+    if(!LIEUX[LIEU]){ const f=lieuxSorted()[0]; if(f)LIEU=f[0]; }
+    render();
+  });
 }
+function lieuxSorted(){ return Object.entries(LIEUX).sort((a,b)=>((a[1].order||0)-(b[1].order||0))||a[1].nom.localeCompare(b[1].nom)); }
 
 // ---------- RENDER ----------
 function render(){
@@ -2508,10 +2528,10 @@ const SUB={stock:"Compte ce que tu as. L'appli calcule le reste.",
 function renderStock(){
   const v=document.getElementById('view');
   let chips='<div class="chips">';
-  for(const k in LIEUX){
+  for(const [k,o] of lieuxSorted()){
     const n=prodList().filter(p=>p.lieu===k&&aCommander(p)).length;
-    chips+='<div class="chip '+(k===LIEU?'on':'')+'" style="--c:'+LIEUX[k].color+'" data-lieu="'+k+'">'
-      +'<span class="dot"></span>'+LIEUX[k].nom+(n?'<span class="badge">'+n+'</span>':'')+'</div>';
+    chips+='<div class="chip '+(k===LIEU?'on':'')+'" style="--c:'+o.color+'" data-lieu="'+k+'">'
+      +'<span class="dot"></span>'+esc(o.nom)+(n?'<span class="badge">'+n+'</span>':'')+'</div>';
   }
   chips+='</div>';
   const list=prodList().filter(p=>p.lieu===LIEU).sort((a,b)=>a.nom.localeCompare(b.nom));
@@ -2519,7 +2539,7 @@ function renderStock(){
   if(!prodList().length){
     cards+='<div class="empty">Aucun produit pour l\'instant.<br>Touche le <b>+</b> en bas pour en créer un, ou charge des exemples dans Réglages.</div>';
   } else if(!list.length){
-    cards+='<div class="empty">Rien dans «&nbsp;'+LIEUX[LIEU].nom+'&nbsp;» pour l\'instant.</div>';
+    cards+='<div class="empty">Rien dans «&nbsp;'+esc((LIEUX[LIEU]||{}).nom||'')+'&nbsp;» pour l\'instant.</div>';
   }
   for(const p of list){
     const st=statut(p);
@@ -2588,6 +2608,47 @@ function renderPrix(){
   v.innerHTML=html;
 }
 
+function zonesCardHtml(){
+  let h='<div class="set-card"><div class="set-h">Zones de stockage</div>'
+    +'<div class="set-sub">Ce sont les onglets du stock. Renomme, recolore, ou ajoute-en.</div>';
+  for(const [k,o] of lieuxSorted()){
+    const n=prodList().filter(p=>p.lieu===k).length;
+    h+='<div class="zrow"><div class="zhead">'
+      +'<span class="zdot" style="background:'+o.color+'"></span>'
+      +'<span class="zname">'+esc(o.nom)+'</span>'
+      +'<span class="zcount">'+n+' produit'+(n>1?'s':'')+'</span>'
+      +'<button class="zbtn" data-zact="rename" data-lieu="'+k+'">✎</button>'
+      +'<button class="zbtn" data-zact="del" data-lieu="'+k+'">🗑</button></div>'
+      +'<div class="zsw">'+ZONE_PALETTE.map(c=>'<span class="sw'+(c.toLowerCase()===(o.color||'').toLowerCase()?' on':'')+'" style="background:'+c+'" data-zact="color" data-lieu="'+k+'" data-color="'+c+'"></span>').join('')+'</div>'
+    +'</div>';
+  }
+  h+='<button class="cta ghost" data-act="addzone" style="margin-top:12px">+ Ajouter une zone</button></div>';
+  return h;
+}
+window.addLieu=async()=>{
+  const n=prompt('Nom de la zone ? (ex : Cave, Réserve, Bar 2)'); if(!n||!n.trim())return;
+  let key=n.trim().toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,''); if(!key)key='zone';
+  if(LIEUX[key])key+=Math.floor(Math.random()*900+100);
+  const used=Object.values(LIEUX).map(z=>(z.color||'').toLowerCase());
+  const color=ZONE_PALETTE.find(c=>!used.includes(c.toLowerCase()))||ZONE_PALETTE[Object.keys(LIEUX).length%ZONE_PALETTE.length];
+  const order=Math.max(0,...Object.values(LIEUX).map(z=>+z.order||0))+1;
+  await set(ref(db,'stock/lieux/'+key),{nom:n.trim(),color,order});
+};
+window.renameLieu=async(k)=>{
+  const cur=(LIEUX[k]||{}).nom||''; const n=prompt('Nouveau nom de la zone :',cur);
+  if(!n||!n.trim()||n.trim()===cur)return;
+  await set(ref(db,'stock/lieux/'+k+'/nom'),n.trim());
+};
+window.setLieuColor=async(k,c)=>{ await set(ref(db,'stock/lieux/'+k+'/color'),c); };
+window.deleteLieu=async(k)=>{
+  const n=prodList().filter(p=>p.lieu===k).length;
+  if(n>0){ alert('Cette zone contient '+n+' produit'+(n>1?'s':'')+'. Déplace-les ou supprime-les d\'abord.'); return; }
+  if(Object.keys(LIEUX).length<=1){ alert('Garde au moins une zone.'); return; }
+  if(!confirm('Supprimer la zone « '+((LIEUX[k]||{}).nom||'')+' » ?'))return;
+  await remove(ref(db,'stock/lieux/'+k));
+  if(LIEU===k){ const f=lieuxSorted().find(([kk])=>kk!==k); if(f)LIEU=f[0]; }
+};
+
 function renderReglages(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="wrap">'
@@ -2595,6 +2656,7 @@ function renderReglages(){
       +'<div id="qrbox" class="qrbox"></div>'
       +'<div class="set-sub">Scanne ce code pour ouvrir LUMIIA Stock.</div>'
       +'<div class="urlrow">'+esc(APP_URL)+'</div></div>'
+    +zonesCardHtml()
     +'<div class="set-card"><div class="set-h">Magasins</div>'
       +'<div class="set-sub">'+(Object.keys(state.magasins).length||'0')+' magasin(s) enregistré(s). Gère-les dans l\'onglet Prix.</div></div>'
     +'<div class="set-card"><div class="set-h">Compte</div>'
@@ -2641,7 +2703,7 @@ window.addMag=async()=>{
 window.openSheet=(id)=>{
   sheetOpen=true;
   const p=id?{id,...state.produits[id]}:{id:'',nom:'',lieu:LIEU,carte:true,uniteStock:'',base:'',parUnite:1,portionNom:'',portionBase:'',kgParUnite:'',stock:0,mini:0,normal:0};
-  const opts=Object.entries(LIEUX).map(([k,o])=>'<option value="'+k+'"'+(k===p.lieu?' selected':'')+'>'+o.nom+'</option>').join('');
+  const opts=lieuxSorted().map(([k,o])=>'<option value="'+k+'"'+(k===p.lieu?' selected':'')+'>'+o.nom+'</option>').join('');
   document.getElementById('sheet').innerHTML=
     '<div class="sh-head"><div class="sh-title">'+(id?'Modifier le produit':'Nouveau produit')+'</div>'
       +'<button class="sh-x" data-act="closesheet">✕</button></div>'
@@ -2709,13 +2771,19 @@ window.seedDemo=async()=>{
   const prix={calamars:{metro:18.5,promocash:17.9},crevettes:{metro:22,promocash:21.5},frites:{metro:6.9,promocash:6.5},
     citrons:{metro:0.30,grandfrais:0.25},lait:{metro:0.95,promocash:0.85,carrefour:0.99},
     whisky:{metro:19.9,carrefour:21.5,cave:18.9},essuietout:{metro:0.80,promocash:0.70}};
-  await update(ref(db,'stock'),{produits,magasins,prix});
+  await update(ref(db,'stock'),{produits,magasins,prix,lieux:DEFAULT_LIEUX});
 };
 
 // ---------- EVENTS (délégation) ----------
 document.getElementById('view').addEventListener('click',e=>{
   const bump=e.target.closest('[data-bump]');
   if(bump){e.stopPropagation();window.bump(bump.dataset.bump,+bump.dataset.d);return;}
+  const zact=e.target.closest('[data-zact]');
+  if(zact){const a=zact.dataset.zact,k=zact.dataset.lieu;
+    if(a==='rename')window.renameLieu(k);
+    else if(a==='del')window.deleteLieu(k);
+    else if(a==='color')window.setLieuColor(k,zact.dataset.color);
+    return;}
   const chip=e.target.closest('[data-lieu]');
   if(chip){LIEU=chip.dataset.lieu;renderStock();return;}
   const edit=e.target.closest('[data-edit]');
@@ -2724,7 +2792,8 @@ document.getElementById('view').addEventListener('click',e=>{
   if(act){const a=act.dataset.act;
     if(a==='addmag')window.addMag();
     else if(a==='logout')window.doLogout();
-    else if(a==='seed')window.seedDemo();}
+    else if(a==='seed')window.seedDemo();
+    else if(a==='addzone')window.addLieu();}
 });
 document.getElementById('view').addEventListener('change',e=>{
   const px=e.target.closest('[data-prix]');

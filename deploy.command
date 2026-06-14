@@ -26,7 +26,7 @@ git add -A
 git commit -m "$MSG" || echo "ℹ️  Rien de nouveau à committer."
 echo
 echo "⬆️   Envoi vers GitHub…"
-if git push; then
+if git push -u origin HEAD; then
   echo
   echo "✅  Déployé. En ligne dans ~1 min :"
   echo "    https://i-immersion.github.io/Stock-bar/"
