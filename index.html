@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LUMIIA Stock — v1.1 -->
+<!-- LUMIIA Stock — v1.2 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -108,6 +108,33 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
 .zsw{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-left:22px}
 .sw{width:24px;height:24px;border-radius:7px;cursor:pointer;border:2px solid transparent;box-sizing:border-box}
 .sw.on{border-color:var(--txt)}
+
+/* guide */
+#guidewrap{position:fixed;inset:0;z-index:95;background:var(--bg);overflow-y:auto;display:none}
+#guidewrap.open{display:block}
+.g-head{position:sticky;top:0;background:rgba(20,22,28,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top));z-index:2}
+.g-title{font-size:17px;font-weight:800}.g-title span{color:var(--congelateur)}
+.g-x{background:var(--card2);border:1px solid var(--line);color:var(--txt);width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;flex:0 0 auto}
+.g-body{padding:14px 18px 70px;max-width:560px;margin:0 auto}
+.g-h2{font-size:18px;font-weight:800;margin:26px 0 6px;padding-top:16px;border-top:1px solid var(--line)}
+.g-h2 .n{color:var(--congelateur)}
+.g-h3{font-size:15px;font-weight:700;margin:16px 0 4px}
+.g-body p{font-size:14px;color:#dfe4ee;margin:7px 0;line-height:1.55}
+.g-body ul,.g-body ol{margin:6px 0 6px 20px;font-size:14px}
+.g-body li{margin:5px 0;line-height:1.5}
+.g-body b{color:#fff}
+.g-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:12px 0;font-size:14px;line-height:1.55}
+.g-card.gold{border-left:4px solid #9BE84B}
+.g-card.warn{border-left:4px solid var(--warn)}
+.g-card.info{border-left:4px solid var(--congelateur)}
+.g-k{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:0 7px;font-weight:700;white-space:nowrap}
+.g-plus{color:var(--ok)}.g-minus{color:var(--bad)}
+.g-z{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border-radius:999px;padding:5px 11px;margin:3px 5px 3px 0;font-size:13px;font-weight:600}
+.g-zdot{width:9px;height:9px;border-radius:50%}
+.g-dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:5px}
+.g-body table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+.g-body th,.g-body td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.g-body th{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
 </style>
 </head>
 <body>
@@ -124,6 +151,7 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
   <button data-tab="reglages"><span class="ic">⚙️</span>Réglages</button>
 </nav>
 <div id="sheetwrap"><div id="sheet"></div></div>
+<div id="guidewrap"></div>
 <div id="login">
   <div class="lg">LUMI<span>IA</span> Stock</div>
   <div class="lsub">Connecte-toi avec ton compte LUMIIA.</div>
@@ -2435,7 +2463,7 @@ var qrcode = function() {
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, remove, push, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const VERSION='v1.1';
+const VERSION='v1.2';
 const APP_URL='https://i-immersion.github.io/Stock-bar/';
 const firebaseConfig={apiKey:"AIzaSyBPgjVFKrP80qX_hlfUFqL168XONfNIBA4",authDomain:"lumiia-live.firebaseapp.com",databaseURL:"https://lumiia-live-default-rtdb.europe-west1.firebasedatabase.app",projectId:"lumiia-live",storageBucket:"lumiia-live.firebasestorage.app",messagingSenderId:"823919513931",appId:"1:823919513931:web:6f6f3c7c6d1699457b18ce"};
 const app=initializeApp(firebaseConfig);
@@ -2608,6 +2636,96 @@ function renderPrix(){
   v.innerHTML=html;
 }
 
+function guideZonesHtml(){
+  const z=lieuxSorted().map(([k,o])=>'<span class="g-z"><span class="g-zdot" style="background:'+o.color+'"></span>'+esc(o.nom)+'</span>').join('');
+  return z||'<i>aucune zone définie</i>';
+}
+function guideHtml(){
+  return `<div class="g-head"><div class="g-title">LUMI<span>IA</span> Stock — Mode d'emploi</div><button class="g-x" data-act="closeguide">✕</button></div>
+<div class="g-body">
+<p style="color:var(--dim)">Cette appli sert à savoir, à tout moment, ce qu'il reste au bar, et à préparer les commandes. Pas besoin d'être précis au gramme près : on compte ce qu'on a en main, l'appli calcule le reste.</p>
+<div class="g-card gold"><b>La règle d'or :</b> quand tu <b>ouvres / entames</b> quelque chose, fais <span class="g-k g-minus">−</span>. Quand tu <b>ranges un achat</b> (nouveau sac, nouvelle bouteille), fais <span class="g-k g-plus">+</span>. C'est tout.</div>
+
+<div class="g-h2"><span class="n">1</span> · Installer sur le téléphone</div>
+<ul>
+<li>L'adresse : <b>i-immersion.github.io/Stock-bar</b></li>
+<li>Pour l'avoir comme une appli : <b>iPhone</b> → Partager ⬆️ → « Sur l'écran d'accueil ». <b>Android</b> → menu ⋮ → « Ajouter à l'écran d'accueil ».</li>
+<li>Le <b>QR code</b> (onglet Réglages) sert à ouvrir l'appli sur un autre téléphone.</li>
+</ul>
+<div class="g-card info">L'appli est <b>partagée en temps réel</b> : ce que l'une modifie, l'autre le voit aussitôt. Tout le monde travaille sur les mêmes chiffres.</div>
+
+<div class="g-h2"><span class="n">2</span> · Les 4 onglets</div>
+<table><tr><th>Onglet</th><th>Sert à</th></tr>
+<tr><td>📦 <b>Stock</b></td><td>Compter (− et +) et voir ce qui manque</td></tr>
+<tr><td>🛒 <b>Commande</b></td><td>La liste à racheter, par magasin</td></tr>
+<tr><td>🏷️ <b>Prix</b></td><td>Les prix par magasin (acheter au moins cher)</td></tr>
+<tr><td>⚙️ <b>Réglages</b></td><td>QR, zones, ce mode d'emploi</td></tr></table>
+
+<div class="g-h2"><span class="n">3</span> · Compter le stock (onglet 📦)</div>
+<ol>
+<li>Choisis la <b>zone</b> en haut (les pastilles colorées).</li>
+<li>Trouve le produit : le gros chiffre = la quantité actuelle.</li>
+<li>Tu ouvres un sac ? <span class="g-k g-minus">−</span>. Tu ranges un achat ? <span class="g-k g-plus">+</span>.</li>
+</ol>
+<div class="g-card warn"><b>On ne compte pas les sacs entamés.</b> Un sac ouvert compte encore comme 1 jusqu'à ce qu'il soit fini. On fait <span class="g-k g-minus">−</span> quand on <b>ouvre</b> un nouveau sac, pas à chaque portion servie.</div>
+<div class="g-h3">Les couleurs</div>
+<ul>
+<li><span class="g-dot" style="background:#2ECC71"></span><b>Vert</b> — il y en a assez.</li>
+<li><span class="g-dot" style="background:#FF9F1C"></span><b>Orange</b> — sous le minimum, à racheter.</li>
+<li><span class="g-dot" style="background:#FF4D4D"></span><b>Rouge</b> — il n'y en a plus.</li>
+</ul>
+<p>Un <b>badge orange</b> sur une zone = des produits à racheter dedans. Sous chaque produit, une ligne grise traduit le stock en portions, pièces, kg.</p>
+
+<div class="g-h2"><span class="n">4</span> · Commande & prix</div>
+<div class="g-h3">🛒 Commande</div>
+<p>Liste tout ce qui est passé sous le minimum, avec la quantité à racheter, <b>regroupée par magasin le moins cher</b>, et un total estimé. C'est la liste de courses.</p>
+<div class="g-card info">Au retour des courses, range les achats : <span class="g-k g-plus">+</span> pour chaque unité rentrée. C'est ça qui remet les compteurs au vert.</div>
+<div class="g-h3">🏷️ Prix</div>
+<ul>
+<li>« + Ajouter un magasin » pour créer un magasin.</li>
+<li>Saisis le prix <b>par unité comptée</b> (par bouteille, par sac…) dans chaque magasin.</li>
+<li>Le moins cher est surligné en vert ↓ et sera choisi dans la commande.</li>
+</ul>
+
+<div class="g-h2"><span class="n">5</span> · Régler une fiche produit</div>
+<p>Ouvrir une fiche : touche la carte du produit (pas les boutons − / +). Créer un produit : le bouton rond <span class="g-k g-plus">+</span> en bas à droite de l'onglet Stock.</p>
+<table>
+<tr><th>Champ</th><th>Sens</th></tr>
+<tr><td><b>Unité comptée</b></td><td>Ce que tu comptes : sac, bouteille, pièce…</td></tr>
+<tr><td><b>Unité de base</b></td><td>L'unité de fond : pièce, cl, kg, L…</td></tr>
+<tr><td><b>1 unité = ? base</b></td><td>La conversion. Ex : 1 sac = 50 pièces → 50.</td></tr>
+<tr><td><b>Portion</b></td><td>Nom + nb d'unités de base. Ex : 1 portion = 9 pièces.</td></tr>
+<tr><td><b>Mini</b></td><td>Seuil d'alerte : en dessous → « à commander ».</td></tr>
+<tr><td><b>Normal</b></td><td>Quantité pleine visée (cible de la commande).</td></tr>
+</table>
+<div class="g-card gold"><b>Exemple — Calamars :</b> unité = sac, base = pièce, 1 sac = 50 pièces, 1 portion = 9 pièces, mini 2, normal 6. → à 1 sac, ça passe orange et propose de racheter 5 sacs.</div>
+<div class="g-card warn"><b>À régler sur les surgelés :</b> ils sont au départ « 1 sac = 1 sac ». Ouvre la fiche et mets le vrai contenu (pièces/kg par sac + portion). Les spiritueux et vins sont déjà réglés (dose 4 cl, verre 12,5 cl).</div>
+
+<div class="g-h2"><span class="n">6</span> · Les zones</div>
+<p>Les zones sont les onglets du stock. Voici <b>vos zones actuelles</b> :</p>
+<p>${guideZonesHtml()}</p>
+<p>Tu les gères dans <b>Réglages → Zones de stockage</b> : ajouter, renommer (✎), recolorer (toucher une pastille), supprimer (🗑, seulement si la zone est vide). Pour déplacer un produit de zone, change son « Lieu » dans sa fiche.</p>
+
+<div class="g-h2"><span class="n">7</span> · La routine de la semaine</div>
+<table><tr><th>Quand</th><th>Quoi</th></tr>
+<tr><td>En continu</td><td>− à chaque sac/bouteille ouvert</td></tr>
+<tr><td>Dimanche soir</td><td>Ouvrir 🛒 Commande = la liste de la semaine</td></tr>
+<tr><td>Courses</td><td>Acheter d'après la liste, au moins cher</td></tr>
+<tr><td>Au retour</td><td>Ranger : + par unité rentrée</td></tr></table>
+<div class="g-card info">La commande n'est pas envoyée toute seule : elle se recalcule en direct. Ouvre-la quand tu veux.</div>
+
+<div class="g-h2"><span class="n">8</span> · En cas de souci</div>
+<table><tr><th>Souci</th><th>Solution</th></tr>
+<tr><td>Écran vide</td><td>Recharger la page (tirer vers le bas), vérifier internet</td></tr>
+<tr><td>Demande de connexion</td><td>Compte LUMIIA (même que Workspace)</td></tr>
+<tr><td>Chiffre faux</td><td>Quelqu'un l'a peut-être changé (partagé) ; recompter</td></tr>
+<tr><td>Produit manquant</td><td>Le créer avec le bouton +</td></tr>
+<tr><td>Blocage</td><td>Noter ce qui s'est passé, prévenir Emmanuel</td></tr></table>
+</div>`;
+}
+window.openGuide=()=>{ const g=document.getElementById('guidewrap'); g.innerHTML=guideHtml(); g.classList.add('open'); g.scrollTop=0; };
+window.closeGuide=()=>document.getElementById('guidewrap').classList.remove('open');
+
 function zonesCardHtml(){
   let h='<div class="set-card"><div class="set-h">Zones de stockage</div>'
     +'<div class="set-sub">Ce sont les onglets du stock. Renomme, recolore, ou ajoute-en.</div>';
@@ -2652,6 +2770,9 @@ window.deleteLieu=async(k)=>{
 function renderReglages(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="wrap">'
+    +'<div class="set-card" style="border-left:4px solid var(--congelateur)"><div class="set-h">📖 Mode d\'emploi</div>'
+      +'<div class="set-sub">Compter le stock, préparer la commande, régler un produit : tout est expliqué.</div>'
+      +'<button class="cta" data-act="guide">Ouvrir le mode d\'emploi</button></div>'
     +'<div class="set-card"><div class="set-h">Ouvrir l\'appli sur un autre téléphone</div>'
       +'<div id="qrbox" class="qrbox"></div>'
       +'<div class="set-sub">Scanne ce code pour ouvrir LUMIIA Stock.</div>'
@@ -2793,7 +2914,8 @@ document.getElementById('view').addEventListener('click',e=>{
     if(a==='addmag')window.addMag();
     else if(a==='logout')window.doLogout();
     else if(a==='seed')window.seedDemo();
-    else if(a==='addzone')window.addLieu();}
+    else if(a==='addzone')window.addLieu();
+    else if(a==='guide')window.openGuide();}
 });
 document.getElementById('view').addEventListener('change',e=>{
   const px=e.target.closest('[data-prix]');
@@ -2810,6 +2932,9 @@ document.getElementById('sheetwrap').addEventListener('click',e=>{
     if(a==='closesheet')window.closeSheet();
     else if(a==='saveprod')window.saveProduct(act.dataset.id);
     else if(a==='delprod')window.deleteProduct(act.dataset.id);}
+});
+document.getElementById('guidewrap').addEventListener('click',e=>{
+  if(e.target.id==='guidewrap'||e.target.closest('[data-act="closeguide"]'))window.closeGuide();
 });
 document.getElementById('fab').addEventListener('click',()=>window.openSheet());
 document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{TAB=b.dataset.tab;render();}));
