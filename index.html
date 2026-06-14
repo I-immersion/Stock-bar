@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LUMIIA Stock — v1.4 -->
+<!-- LUMIIA Stock — v1.5 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -2463,7 +2463,7 @@ var qrcode = function() {
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, remove, push, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const VERSION='v1.4';
+const VERSION='v1.5';
 const APP_URL='https://i-immersion.github.io/Stock-bar/';
 const firebaseConfig={apiKey:"AIzaSyBPgjVFKrP80qX_hlfUFqL168XONfNIBA4",authDomain:"lumiia-live.firebaseapp.com",databaseURL:"https://lumiia-live-default-rtdb.europe-west1.firebasedatabase.app",projectId:"lumiia-live",storageBucket:"lumiia-live.firebasestorage.app",messagingSenderId:"823919513931",appId:"1:823919513931:web:6f6f3c7c6d1699457b18ce"};
 const app=initializeApp(firebaseConfig);
@@ -2594,7 +2594,7 @@ function renderCommande(){
   const todo=prodList().filter(aCommander);
   if(!todo.length){ v.innerHTML='<div class="empty">Rien à commander 🎉<br>Tous les stocks sont au-dessus du mini.</div>'; return; }
   const parMag={};
-  for(const p of todo){ const m=moinsCher(p.id)||'__none__'; (parMag[m]=parMag[m]||[]).push(p); }
+  for(const p of todo){ const m=(p.magasin&&state.magasins[p.magasin])?p.magasin:(moinsCher(p.id)||'__none__'); (parMag[m]=parMag[m]||[]).push(p); }
   let html='<div class="wrap"><div class="note">Commande pour remonter chaque produit au stock normal. Regroupée par magasin le moins cher.</div>';
   let grand=0;
   for(const m in parMag){
@@ -2834,6 +2834,7 @@ window.openSheet=(id)=>{
   sheetOpen=true;
   const p=id?{id,...state.produits[id]}:{id:'',nom:'',lieu:LIEU,carte:true,uniteStock:'',base:'',parUnite:1,portionNom:'',portionBase:'',kgParUnite:'',stock:0,mini:0,normal:0};
   const opts=lieuxSorted().map(([k,o])=>'<option value="'+k+'"'+(k===p.lieu?' selected':'')+'>'+o.nom+'</option>').join('');
+  const magOpts='<option value="">— Au moins cher (selon les prix)</option>'+Object.entries(state.magasins).sort((a,b)=>(''+a[1]).localeCompare(''+b[1])).map(([k,n])=>'<option value="'+k+'"'+(k===p.magasin?' selected':'')+'>'+esc(n)+'</option>').join('');
   document.getElementById('sheet').innerHTML=
     '<div class="sh-head"><div class="sh-title">'+(id?'Modifier le produit':'Nouveau produit')+'</div>'
       +'<button class="sh-x" data-act="closesheet">✕</button></div>'
@@ -2851,6 +2852,8 @@ window.openSheet=(id)=>{
     +fld('Poids par unité comptée en kg (optionnel)','f-kg','number',p.kgParUnite||'')
     +'<div class="shsep">Stock & seuils</div>'
     +'<div class="frow3">'+fld3('Stock','f-stock',p.stock)+fld3('Mini','f-mini',p.mini)+fld3('Normal','f-normal',p.normal)+'</div>'
+    +'<div class="shsep">Commande</div>'
+    +'<div class="frow"><label>Magasin habituel</label><select id="f-magasin">'+magOpts+'</select></div>'
     +dlist('dl-unite',unitesComptees())+dlist('dl-base',unitesBase())+dlist('dl-pnom',portionsNoms())
     +'<button class="cta" data-act="saveprod" data-id="'+(id||'')+'">'+(id?'Enregistrer':'Créer le produit')+'</button>'
     +(id?'<button class="cta danger" data-act="delprod" data-id="'+id+'">Supprimer</button>':'')
@@ -2874,6 +2877,7 @@ window.saveProduct=async(id)=>{
   const pn=g('f-pnom').trim(), pb=num(g('f-pbase')), kg=num(g('f-kg'));
   if(pn&&pb){obj.portionNom=pn;obj.portionBase=pb;}
   if(kg)obj.kgParUnite=kg;
+  const mag=g('f-magasin'); if(mag)obj.magasin=mag;
   let key=id;
   if(!key){key=nom.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,'').slice(0,24)||'p';
     if(state.produits[key])key+=Math.floor(Math.random()*900+100);}
