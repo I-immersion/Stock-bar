@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LUMIIA Stock — v1.6 -->
+<!-- LUMIIA Stock — v1.7 -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -2479,7 +2479,7 @@ var qrcode = function() {
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, remove, push, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const VERSION='v1.6';
+const VERSION='v1.7';
 const APP_URL='https://i-immersion.github.io/Stock-bar/';
 const firebaseConfig={apiKey:"AIzaSyBPgjVFKrP80qX_hlfUFqL168XONfNIBA4",authDomain:"lumiia-live.firebaseapp.com",databaseURL:"https://lumiia-live-default-rtdb.europe-west1.firebasedatabase.app",projectId:"lumiia-live",storageBucket:"lumiia-live.firebasestorage.app",messagingSenderId:"823919513931",appId:"1:823919513931:web:6f6f3c7c6d1699457b18ce"};
 const app=initializeApp(firebaseConfig);
@@ -2501,7 +2501,7 @@ const ZONE_PALETTE=['#3FA9F5','#2ECC71','#E8A23D','#B96CFF','#8A93A6','#FF6B6B',
 
 let state={produits:{},magasins:{},prix:{},lieux:{}};
 let TAB='stock', LIEU='congelateur', USER=null, sheetOpen=false;
-let prixOpenZones=new Set(), prixOpenProd=null;
+let prixOpenZones=new Set(), prixOpenProd=null, magOpen=false;
 
 // ---------- helpers ----------
 const F=n=>{const r=Math.round((+n||0)*100)/100;return (r%1===0?r.toFixed(0):r.toFixed(2)).replace('.',',');};
@@ -2636,14 +2636,18 @@ function renderPrix(){
   const v=document.getElementById('view');
   const mags=Object.entries(state.magasins).sort((a,b)=>(''+a[1]).localeCompare(''+b[1]));
   let html='<div class="wrap">';
-  html+='<div class="set-card"><div class="set-h">Magasins</div>';
+  html+='<div class="acc'+(magOpen?' open':'')+'"><div class="acc-head" data-magacc="1">Magasins<span class="zcount">'+mags.length+'</span><span class="chev">›</span></div>';
+  if(magOpen){
+    html+='<div class="acc-body" style="padding-bottom:12px">';
   if(!mags.length) html+='<div class="set-sub">Aucun magasin pour l\'instant.</div>';
   for(const [k,n] of mags){
     html+='<div class="mrow"><span class="mname">'+esc(n)+'</span>'
       +'<button class="zbtn" data-mact="rename" data-mag="'+k+'">✎</button>'
       +'<button class="zbtn" data-mact="del" data-mag="'+k+'">🗑</button></div>';
   }
-  html+='<button class="cta ghost" data-act="addmag" style="margin-top:12px">+ Ajouter un magasin</button></div>';
+    html+='<button class="cta ghost" data-act="addmag" style="margin-top:12px">+ Ajouter un magasin</button></div>';
+  }
+  html+='</div>';
   if(!prodList().length){ v.innerHTML=html+'<div class="empty">Crée d\'abord des produits.</div></div>'; return; }
   for(const [zk,zo] of lieuxSorted()){
     const prods=prodList().filter(p=>p.lieu===zk).sort((a,b)=>a.nom.localeCompare(b.nom));
@@ -2873,7 +2877,7 @@ window.deleteMag=async(k)=>{
 };
 
 // ---------- BOTTOM SHEET (CRUD produit) ----------
-const UNITES_C=['sac','bouteille','pièce','brique','fût','rouleau','paquet','sachet','boîte','pot','bidon','bombe','carton','cubi','caisse','barquette','bocal','canette','plaque'];
+const UNITES_C=['sac','bouteille','fût 20L','fût 30L','pièce','brique','fût','rouleau','paquet','sachet','boîte','pot','bidon','bombe','carton','cubi','caisse','barquette','bocal','canette','plaque'];
 const UNITES_B=['pièce','cl','ml','L','kg','g','dose','tranche','rouleau','feuille'];
 const PORTIONS_N=['portion','dose','verre','part','ration','shot'];
 function uniqList(a){const s=[];for(const x of a){if(x&&!s.includes(x))s.push(x);}return s;}
@@ -2981,6 +2985,8 @@ document.getElementById('view').addEventListener('click',e=>{
   if(pacc){const id=pacc.dataset.prod; prixOpenProd=(prixOpenProd===id?null:id); renderPrix(); return;}
   const mact=e.target.closest('[data-mact]');
   if(mact){const a=mact.dataset.mact; if(a==='rename')window.renameMag(mact.dataset.mag); else if(a==='del')window.deleteMag(mact.dataset.mag); return;}
+  const magacc=e.target.closest('[data-magacc]');
+  if(magacc){magOpen=!magOpen; renderPrix(); return;}
   const act=e.target.closest('[data-act]');
   if(act){const a=act.dataset.act;
     if(a==='addmag')window.addMag();
