@@ -151,6 +151,14 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
 .mrow{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--line)}
 .mrow:first-of-type{border-top:none}
 .mname{flex:1;font-weight:600;font-size:14px}
+.ol-row .cmd-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.ol-row .cmd-states{display:flex;gap:4px;flex:none}
+.cs{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:transparent;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,color .15s;color:var(--dim2);font-family:inherit}
+.cs:hover{border-color:var(--dim);color:var(--dim)}
+.cs.act{color:var(--txt)}
+.cs[data-cmd="todo"].act{background:color-mix(in srgb,var(--warn) 16%,var(--card));border-color:var(--warn);color:var(--warn)}
+.cs[data-cmd="ordered"].act{background:color-mix(in srgb,#B96CFF 18%,var(--card));border-color:#B96CFF;color:#D3B3FF}
+.cs[data-cmd="received"].act{background:color-mix(in srgb,var(--ok) 18%,var(--card));border-color:var(--ok);color:var(--ok)}
 </style>
 </head>
 <body>
@@ -2499,7 +2507,7 @@ const DEFAULT_LIEUX={
 };
 const ZONE_PALETTE=['#3FA9F5','#2ECC71','#E8A23D','#B96CFF','#8A93A6','#FF6B6B','#22D3C5','#F5C542','#7C83FF','#FF8FB1'];
 
-let state={produits:{},magasins:{},prix:{},lieux:{}};
+let state={produits:{},magasins:{},prix:{},lieux:{},commandes:{}};
 let TAB='stock', LIEU='congelateur', USER=null, sheetOpen=false;
 let prixOpenZones=new Set(), prixOpenProd=null, magOpen=false;
 
@@ -2545,6 +2553,7 @@ function attachListeners(){
   onValue(ref(db,'stock/produits'),s=>{state.produits=s.val()||{};render();});
   onValue(ref(db,'stock/magasins'),s=>{state.magasins=s.val()||{};render();});
   onValue(ref(db,'stock/prix'),s=>{state.prix=s.val()||{};render();});
+  onValue(ref(db,'stock/commandes'),s=>{state.commandes=s.val()||{};render();});
   onValue(ref(db,'stock/lieux'),s=>{
     const v=s.val();
     if((!v||!Object.keys(v).length)){ set(ref(db,'stock/lieux'),DEFAULT_LIEUX).catch(()=>{}); return; }
@@ -2612,7 +2621,7 @@ function renderCommande(){
   if(!todo.length){ v.innerHTML='<div class="empty">Rien à commander 🎉<br>Tous les stocks sont au-dessus du mini.</div>'; return; }
   const parMag={};
   for(const p of todo){ const m=(p.magasin&&state.magasins[p.magasin])?p.magasin:(moinsCher(p.id)||'__none__'); (parMag[m]=parMag[m]||[]).push(p); }
-  let html='<div class="wrap"><div class="note">Commande pour remonter chaque produit au stock normal. Regroupée par magasin le moins cher.</div>';
+  let html='<div class="wrap"><div class="note">📋 à commander → ⏳ commandé → ✓ reçu (ajoute la quantité au stock). Trois cases par ligne, tap pour changer.</div>';
   let grand=0;
   for(const m in parMag){
     let sub=0, rows='';
@@ -2620,9 +2629,17 @@ function renderCommande(){
       const q=qteCmd(p);
       const pr=m==='__none__'?null:(state.prix[p.id]||{})[m];
       const line=pr!=null?pr*q:null; if(line!=null)sub+=line;
-      rows+='<div class="ol-row"><div><span class="q">'+F(q)+' '+esc(p.uniteStock)+(q>1?'s':'')+'</span> '+esc(p.nom)
+      const etat=(state.commandes[p.id]&&state.commandes[p.id].etat)||'todo';
+      rows+='<div class="ol-row"><div class="cmd-left">'
+        +'<div class="cmd-states">'
+          +'<button class="cs '+(etat==='todo'?'act':'')+'" data-cmd="todo" data-pid="'+p.id+'" title="À commander">📋</button>'
+          +'<button class="cs '+(etat==='ordered'?'act':'')+'" data-cmd="ordered" data-pid="'+p.id+'" data-qty="'+q+'" data-mag="'+(m==='__none__'?'':m)+'" title="Commandé">⏳</button>'
+          +'<button class="cs '+(etat==='received'?'act':'')+'" data-cmd="received" data-pid="'+p.id+'" data-qty="'+q+'" title="Reçu — ajoute '+F(q)+' au stock">✓</button>'
+        +'</div>'
+        +'<div><span class="q">'+F(q)+' '+esc(p.uniteStock)+(q>1?'s':'')+'</span> '+esc(p.nom)
         +'<div class="qd">stock '+F(p.stock)+' → '+F(p.normal)+'</div></div>'
-        +'<div class="pr">'+(pr!=null?F(line)+' €':'—')+'</div></div>';
+      +'</div>'
+      +'<div class="pr">'+(pr!=null?F(line)+' €':'—')+'</div></div>';
     }
     grand+=sub;
     const title=m==='__none__'?'— magasin non défini':esc(magName(m));
@@ -2967,6 +2984,27 @@ window.seedDemo=async()=>{
 
 // ---------- EVENTS (délégation) ----------
 document.getElementById('view').addEventListener('click',e=>{
+  const cmd=e.target.closest('[data-cmd]');
+  if(cmd){e.stopPropagation();
+    const pid=cmd.dataset.pid, etat=cmd.dataset.cmd;
+    const cmdRef=ref(db,'stock/commandes/'+pid);
+    const prod=state.produits[pid];
+    if(!prod){return;}
+    if(etat==='todo'){
+      // retour à "à commander" → supprime l'entrée
+      set(cmdRef,null).catch(()=>{});
+    } else if(etat==='ordered'){
+      // marqué comme commandé → mémorise quantité + magasin
+      set(cmdRef,{etat:'ordered',quantite:+cmd.dataset.qty,magasin:cmd.dataset.mag||null,modifAt:Date.now()}).catch(()=>{});
+    } else if(etat==='received'){
+      // reçu → +qte au stock + supprime l'entrée
+      const stored=state.commandes[pid];
+      const qte=stored&&stored.quantite!=null?+stored.quantite:+cmd.dataset.qty;
+      const nouveauStock=(+prod.stock||0)+qte;
+      update(ref(db,'stock/produits/'+pid),{stock:nouveauStock}).then(()=>set(cmdRef,null)).catch(()=>{});
+    }
+    return;
+  }
   const bump=e.target.closest('[data-bump]');
   if(bump){e.stopPropagation();window.bump(bump.dataset.bump,+bump.dataset.d);return;}
   const zact=e.target.closest('[data-zact]');
