@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LUMIIA Stock — v1.8 (commandes avec workflow d'états + reçu = +stock) -->
+<!-- LUMIIA Stock — v1.9 (recherche globale de produit) -->
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -159,6 +159,15 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
 .cs[data-cmd="todo"].act{background:color-mix(in srgb,var(--warn) 16%,var(--card));border-color:var(--warn);color:var(--warn)}
 .cs[data-cmd="ordered"].act{background:color-mix(in srgb,#B96CFF 18%,var(--card));border-color:#B96CFF;color:#D3B3FF}
 .cs[data-cmd="received"].act{background:color-mix(in srgb,var(--ok) 18%,var(--card));border-color:var(--ok);color:var(--ok)}
+.search-bar{padding:10px 12px 6px;position:sticky;top:0;z-index:10;background:var(--bg)}
+.search-bar .swrap{position:relative}
+.search-bar input{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:10px 38px 10px 38px;font-size:15px;font-family:inherit;-webkit-appearance:none;box-sizing:border-box}
+.search-bar input:focus{outline:none;border-color:var(--bar,#B96CFF)}
+.search-bar input::-webkit-search-cancel-button{-webkit-appearance:none}
+.search-bar .sicon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dim);font-size:15px;line-height:1}
+.search-bar .sclr{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--card);border:none;color:var(--dim);cursor:pointer;font-size:14px;line-height:1;padding:6px 9px;border-radius:8px;font-family:inherit}
+.search-bar .sclr:hover{color:var(--txt)}
+.search-hits{color:var(--dim);font-size:12px;padding:0 4px 8px;font-weight:600}
 </style>
 </head>
 <body>
@@ -166,6 +175,13 @@ nav button .nbadge{position:absolute;top:6px;left:50%;margin-left:6px}
   <div class="h-top"><div class="h-title">LUMI<span>IA</span> · Stock</div><div class="h-ver" id="ver"></div></div>
   <div class="h-sub" id="hsub">Compte ce que tu as. L'appli calcule le reste.</div>
 </header>
+<div class="search-bar" id="search-bar">
+  <div class="swrap">
+    <span class="sicon">🔎</span>
+    <input type="search" id="search" placeholder="Rechercher un produit… (ex : orange)" autocomplete="off" enterkeyhint="search">
+    <button class="sclr" id="search-clear" type="button" style="display:none">Effacer</button>
+  </div>
+</div>
 <div id="view"></div>
 <button class="fab" id="fab">+</button>
 <nav>
@@ -2487,7 +2503,7 @@ var qrcode = function() {
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, onValue, set, remove, push, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-const VERSION='v1.8';
+const VERSION='v1.9';
 const APP_URL='https://i-immersion.github.io/Stock-bar/';
 const firebaseConfig={apiKey:"AIzaSyBPgjVFKrP80qX_hlfUFqL168XONfNIBA4",authDomain:"lumiia-live.firebaseapp.com",databaseURL:"https://lumiia-live-default-rtdb.europe-west1.firebasedatabase.app",projectId:"lumiia-live",storageBucket:"lumiia-live.firebasestorage.app",messagingSenderId:"823919513931",appId:"1:823919513931:web:6f6f3c7c6d1699457b18ce"};
 const app=initializeApp(firebaseConfig);
@@ -2508,7 +2524,8 @@ const DEFAULT_LIEUX={
 const ZONE_PALETTE=['#3FA9F5','#2ECC71','#E8A23D','#B96CFF','#8A93A6','#FF6B6B','#22D3C5','#F5C542','#7C83FF','#FF8FB1'];
 
 let state={produits:{},magasins:{},prix:{},lieux:{},commandes:{}};
-let TAB='stock', LIEU='congelateur', USER=null, sheetOpen=false;
+let TAB='stock', LIEU='congelateur', USER=null, sheetOpen=false, SEARCH='';
+const norm=s=>(s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 let prixOpenZones=new Set(), prixOpenProd=null, magOpen=false;
 
 // ---------- helpers ----------
@@ -2570,6 +2587,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===TAB));
   document.getElementById('hsub').textContent=SUB[TAB];
   document.getElementById('fab').style.display=(TAB==='stock')?'flex':'none';
+  document.getElementById('search-bar').style.display=(TAB==='stock')?'block':'none';
   if(TAB==='stock')renderStock(); else if(TAB==='commande')renderCommande();
   else if(TAB==='prix')renderPrix(); else renderReglages();
   refreshBadges();
@@ -2581,25 +2599,44 @@ const SUB={stock:"Compte ce que tu as. L'appli calcule le reste.",
 
 function renderStock(){
   const v=document.getElementById('view');
-  let chips='<div class="chips">';
-  for(const [k,o] of lieuxSorted()){
-    const n=prodList().filter(p=>p.lieu===k&&aCommander(p)).length;
-    chips+='<div class="chip '+(k===LIEU?'on':'')+'" style="--c:'+o.color+'" data-lieu="'+k+'">'
-      +'<span class="dot"></span>'+esc(o.nom)+(n?'<span class="badge">'+n+'</span>':'')+'</div>';
+  const q=norm(SEARCH.trim());
+  const searching=q.length>0;
+
+  let chips='';
+  if(!searching){
+    chips='<div class="chips">';
+    for(const [k,o] of lieuxSorted()){
+      const n=prodList().filter(p=>p.lieu===k&&aCommander(p)).length;
+      chips+='<div class="chip '+(k===LIEU?'on':'')+'" style="--c:'+o.color+'" data-lieu="'+k+'">'
+        +'<span class="dot"></span>'+esc(o.nom)+(n?'<span class="badge">'+n+'</span>':'')+'</div>';
+    }
+    chips+='</div>';
   }
-  chips+='</div>';
-  const list=prodList().filter(p=>p.lieu===LIEU).sort((a,b)=>a.nom.localeCompare(b.nom));
+
+  const list = searching
+    ? prodList().filter(p=>norm(p.nom).includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom))
+    : prodList().filter(p=>p.lieu===LIEU).sort((a,b)=>a.nom.localeCompare(b.nom));
+
   let cards='<div class="wrap">';
+  if(searching){
+    cards+='<div class="search-hits">'+list.length+' résultat'+(list.length>1?'s':'')+' pour «&nbsp;'+esc(SEARCH.trim())+'&nbsp;»</div>';
+  }
   if(!prodList().length){
     cards+='<div class="empty">Aucun produit pour l\'instant.<br>Touche le <b>+</b> en bas pour en créer un, ou charge des exemples dans Réglages.</div>';
   } else if(!list.length){
-    cards+='<div class="empty">Rien dans «&nbsp;'+esc((LIEUX[LIEU]||{}).nom||'')+'&nbsp;» pour l\'instant.</div>';
+    if(searching){
+      cards+='<div class="empty">Aucun produit ne correspond à «&nbsp;'+esc(SEARCH.trim())+'&nbsp;».</div>';
+    } else {
+      cards+='<div class="empty">Rien dans «&nbsp;'+esc((LIEUX[LIEU]||{}).nom||'')+'&nbsp;» pour l\'instant.</div>';
+    }
   }
   for(const p of list){
     const st=statut(p);
+    const lieuTag = searching ? '<span class="tag" style="--c:'+((LIEUX[p.lieu]||{}).color||'#888')+';background:color-mix(in srgb,var(--c) 25%,transparent);color:var(--c)">'+esc((LIEUX[p.lieu]||{}).nom||p.lieu)+'</span>' : '';
     cards+='<div class="card" style="--st:'+STCOL[st]+'" data-edit="'+p.id+'">'
       +'<div class="c-head"><div><div class="c-name">'+esc(p.nom)+'</div>'
-        +'<div class="c-meta">'+(p.carte?'<span class="tag">À la carte</span>':'<span class="tag conso">Consommable</span>')
+        +'<div class="c-meta">'+lieuTag
+        +(p.carte?'<span class="tag">À la carte</span>':'<span class="tag conso">Consommable</span>')
         +'<span class="tag">1 '+esc(p.uniteStock)+' = '+F(p.parUnite)+' '+esc(p.base)+'</span></div></div>'
         +'<div class="st-badge">'+STLAB[st]+'</div></div>'
       +'<div class="counter">'
@@ -2983,6 +3020,17 @@ window.seedDemo=async()=>{
 };
 
 // ---------- EVENTS (délégation) ----------
+document.getElementById('search').addEventListener('input',e=>{
+  SEARCH=e.target.value;
+  document.getElementById('search-clear').style.display=SEARCH?'block':'none';
+  if(TAB==='stock')renderStock();
+});
+document.getElementById('search-clear').addEventListener('click',()=>{
+  SEARCH='';
+  const s=document.getElementById('search'); s.value=''; s.focus();
+  document.getElementById('search-clear').style.display='none';
+  if(TAB==='stock')renderStock();
+});
 document.getElementById('view').addEventListener('click',e=>{
   const cmd=e.target.closest('[data-cmd]');
   if(cmd){e.stopPropagation();
